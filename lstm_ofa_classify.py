@@ -66,8 +66,8 @@ for key in dict:
         win_fun = np.hamming(nw)
         frames = enframe(wave_data[0], nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
 
-        frames = np.fft.fft(frames)
-        frames = np.sqrt(frames.real**2 + frames.imag ** 2)
+        # frames = np.fft.fft(frames)
+        # frames = np.sqrt(frames.real**2 + frames.imag ** 2)
         frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
         frames = list(frames)
 
@@ -169,9 +169,7 @@ class LSTMcell(object):
         return hstates
 
 
-# In[10]:
-
-
+# LSTM init and func
 def weight_init(shape):
     initial = tf.random_uniform(shape,minval=-np.sqrt(5)*np.sqrt(1.0/shape[0]), maxval=np.sqrt(5)*np.sqrt(1.0/shape[0]))
     return tf.Variable(initial, trainable=True)
@@ -203,6 +201,30 @@ def shufflelists(data):
     return data
 
 
+# CNN init and func
+def weight_variable(shape):
+    initial = tf.truncated_normal(shape, stddev=0.1)
+    return tf.Variable(initial)
+
+
+def bias_variable(shape):
+    initial = tf.constant(0.1, shape=shape)
+    return tf.Variable(initial)
+
+
+def conv2d(x, W):
+    return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
+
+
+def max_pool_1x2(x):
+    return tf.nn.max_pool(x, ksize=[1, 1, 2, 1], strides=[1, 1, 2, 1], padding='SAME')
+
+
+def max_pool_2x2(x):
+    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+
+
+
 D_input = 512
 D_label = 4
 learning_rate = 7e-5
@@ -211,7 +233,31 @@ num_units = 1024
 inputs = tf.placeholder(tf.float32, [None, None, D_input], name="inputs")
 labels = tf.placeholder(tf.float32, [None, D_label], name="labels")
 
-rnn_cell = LSTMcell(inputs, D_input, num_units, orthogonal_initializer)
+# CNN part
+# 输入
+x_input = tf.reshape(inputs, [-1, 1, D_input, 1])
+
+# 第一个卷积层
+W_conv1 = weight_variable([1, 5, 1, 32])
+b_conv1 = bias_variable([32])
+h_conv1 = tf.nn.relu(conv2d(x_input, W_conv1) + b_conv1)
+h_pool1 = max_pool_1x2(h_conv1)
+
+# 第二个卷积层
+W_conv2 = weight_variable([1, 5, 32, 32])
+b_conv2 = bias_variable([32])
+h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
+h_pool2 = max_pool_1x2(h_conv2)
+
+# 密集链接层
+# 密集链接映射为256维，并作为LSTM的输入
+LSTM_input_dimension = 256
+W_fc1 = weight_variable([1 * 48 * 32, 256])
+b_fc1 = bias_variable([256])
+h_pool2_flat = tf.reshape(h_pool2, [-1, 1 * 48 * 32])
+LSTM_input = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
+
+rnn_cell = LSTMcell(LSTM_input, LSTM_input_dimension, num_units, orthogonal_initializer)
 rnn_out = rnn_cell.all_steps()
 # reshape for output layer
 rnn = tf.reshape(rnn_out, [-1, num_units])
