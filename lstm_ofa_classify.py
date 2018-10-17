@@ -37,13 +37,122 @@ def enframe(signal, nw, inc, winfunc):
     return frames * win   # 返回帧信号矩阵
 
 
+class LSTMcell(object):
+    def __init__(self, incoming, D_input, D_cell, initializer, f_bias=1.0):
+        # var
+        # the shape of incoming is [n_samples, n_steps, D_cell]
+        self.incoming = incoming
+        self.D_input = D_input
+        self.D_cell = D_cell
+        # parameters
+        # igate = W_xi.* x + W_hi.* h + b_i
+        self.W_xi = initializer([self.D_input, self.D_cell])
+        self.W_hi = initializer([self.D_cell, self.D_cell])
+        self.b_i = tf.Variable(tf.zeros([self.D_cell]))
+        # fgate = W_xf.* x + W_hf.* h + b_f
+        self.W_xf = initializer([self.D_input, self.D_cell])
+        self.W_hf = initializer([self.D_cell, self.D_cell])
+        self.b_f = tf.Variable(tf.constant(f_bias, shape=[self.D_cell]))
+        # ogate = W_xo.* x + W_ho.* h + b_o
+        self.W_xo = initializer([self.D_input, self.D_cell])
+        self.W_ho = initializer([self.D_cell, self.D_cell])
+        self.b_o = tf.Variable(tf.zeros([self.D_cell]))
+        # cell = W_xc.* x + W_hc.* h + b_c
+        self.W_xc = initializer([self.D_input, self.D_cell])
+        self.W_hc = initializer([self.D_cell, self.D_cell])
+        self.b_c = tf.Variable(tf.zeros([self.D_cell]))
+
+        # init cell and hidden state whose shapes are [n_samples, D_cell]
+        init_for_both = tf.matmul(self.incoming[:, 0, :], tf.zeros([self.D_input, self.D_cell]))
+        self.hid_init = init_for_both
+        self.cell_init = init_for_both
+        # because tf.scan only takes two arguments, the hidden state and cell are needed to merge
+        self.previous_h_c_tuple = tf.stack([self.hid_init, self.cell_init])
+        # transpose the tensor so that the first dim is time_step
+        self.incoming = tf.transpose(self.incoming, perm=[1, 0, 2])
+
+    def one_step(self, previous_h_c_tuple, current_x):
+        # to split hidden state and cell
+        prev_h, prev_c = tf.unstack(previous_h_c_tuple)
+
+        # computing
+        # input gate
+        i = tf.sigmoid(
+            tf.matmul(current_x, self.W_xi) +
+            tf.matmul(prev_h, self.W_hi) +
+            self.b_i)
+        # forget Gate
+        f = tf.sigmoid(
+            tf.matmul(current_x, self.W_xf) +
+            tf.matmul(prev_h, self.W_hf) +
+            self.b_f)
+        # output Gate
+        o = tf.sigmoid(
+            tf.matmul(current_x, self.W_xo) +
+            tf.matmul(prev_h, self.W_ho) +
+            self.b_o)
+        # new cell info
+        c = tf.tanh(
+            tf.matmul(current_x, self.W_xc) +
+            tf.matmul(prev_h, self.W_hc) +
+            self.b_c)
+        # current cell
+        current_c = f * prev_c + i * c
+        # current hidden state
+        current_h = o * tf.tanh(current_c)
+
+        return tf.stack([current_h, current_c])
+
+    def all_steps(self):
+        # inputs shape : [n_sample, n_steps, D_input]
+        # outputs shape : [n_steps, n_sample, D_output]
+        hstates = tf.scan(fn=self.one_step,
+                          elems=self.incoming,
+                          initializer=self.previous_h_c_tuple,
+                          name='hstates')[:, 0, :, :]
+        return hstates
+
+
+# LSTM init and func
+def weight_init(shape):
+    initial = tf.random_uniform(shape, minval=-np.sqrt(5) * np.sqrt(1.0 / shape[0]),
+                                maxval=np.sqrt(5) * np.sqrt(1.0 / shape[0]))
+    return tf.Variable(initial, trainable=True)
+
+
+def zero_init(shape):
+    initial = tf.Variable(tf.zeros(shape))
+    return tf.Variable(initial, trainable=True)
+
+
+def orthogonal_initializer(shape, scale=1.0):
+    scale = 1.0
+    flat_shape = (shape[0], np.prod(shape[1:]))
+    a = np.random.normal(0.0, 1.0, flat_shape)
+    u, _, v = np.linalg.svd(a, full_matrices=False)
+    q = u if u.shape == flat_shape else v
+    q = q.reshape(shape)  # this needs to be corrected to float32
+    return tf.Variable(scale * q[:shape[0], :shape[1]], trainable=True, dtype=tf.float32)
+
+
+def bias_init(shape):
+    initial = tf.constant(0.01, shape=shape)
+    return tf.Variable(initial)
+
+
+def shufflelists(data):
+    ri = np.random.permutation(len(data))
+    data = [data[i] for i in ri]
+    return data
+
+
 # In[4]:
 
 dict = {0: '', 1: '', 2: '', 3: ''}
-dict[0] = "/media/ywy/本地磁盘/Data/光纤音频/布放光缆"
-dict[1] = "/media/ywy/本地磁盘/Data/光纤音频/机械施工"
-dict[2] = "/media/ywy/本地磁盘/Data/光纤音频/井内人工动作"
-dict[3] = "/media/ywy/本地磁盘/Data/光纤音频/雨水流入井内冲击光缆"
+dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
+dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
+dict[2] = "/media/fish/Elements/Project/光纤传感/光纤音频/井内人工动作"
+dict[3] = "/media/fish/Elements/Project/光纤传感/光纤音频/雨水流入井内冲击光缆"
 
 
 train = [] #384
@@ -66,8 +175,8 @@ for key in dict:
         win_fun = np.hamming(nw)
         frames = enframe(wave_data[0], nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
 
-        # frames = np.fft.fft(frames)
-        # frames = np.sqrt(frames.real**2 + frames.imag ** 2)
+        frames = np.fft.fft(frames)
+        frames = np.sqrt(frames.real**2 + frames.imag ** 2)
         frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
         frames = list(frames)
 
@@ -90,141 +199,6 @@ print('num of test sequences:%s' %len(test))    # 96
 print('shape of inputs:', test[0][0].shape)     # (1,1722,512)
 print('shape of labels:', test[0][1].shape)     # (1,4)
 
-
-class LSTMcell(object):
-    def __init__(self, incoming, D_input, D_cell, initializer, f_bias=1.0):
-        
-        # var
-        # the shape of incoming is [n_samples, n_steps, D_cell]
-        self.incoming = incoming
-        self.D_input = D_input
-        self.D_cell = D_cell
-        # parameters
-          # igate = W_xi.* x + W_hi.* h + b_i
-        self.W_xi = initializer([self.D_input, self.D_cell])
-        self.W_hi = initializer([self.D_cell, self.D_cell])
-        self.b_i  = tf.Variable(tf.zeros([self.D_cell]))  
-          # fgate = W_xf.* x + W_hf.* h + b_f
-        self.W_xf = initializer([self.D_input, self.D_cell])
-        self.W_hf = initializer([self.D_cell, self.D_cell])
-        self.b_f  = tf.Variable(tf.constant(f_bias, shape=[self.D_cell])) 
-          # ogate = W_xo.* x + W_ho.* h + b_o
-        self.W_xo = initializer([self.D_input, self.D_cell])
-        self.W_ho = initializer([self.D_cell, self.D_cell])
-        self.b_o  = tf.Variable(tf.zeros([self.D_cell])) 
-          # cell = W_xc.* x + W_hc.* h + b_c
-        self.W_xc = initializer([self.D_input, self.D_cell])
-        self.W_hc = initializer([self.D_cell, self.D_cell])
-        self.b_c  = tf.Variable(tf.zeros([self.D_cell]))  
-        
-        # init cell and hidden state whose shapes are [n_samples, D_cell]
-        init_for_both = tf.matmul(self.incoming[:,0,:], tf.zeros([self.D_input, self.D_cell]))
-        self.hid_init = init_for_both
-        self.cell_init = init_for_both
-        # because tf.scan only takes two arguments, the hidden state and cell are needed to merge
-        self.previous_h_c_tuple = tf.stack([self.hid_init, self.cell_init])
-        # transpose the tensor so that the first dim is time_step
-        self.incoming = tf.transpose(self.incoming, perm=[1,0,2])
-        
-    def one_step(self, previous_h_c_tuple, current_x):
-        
-        # to split hidden state and cell
-        prev_h, prev_c = tf.unstack(previous_h_c_tuple)
-        
-        # computing
-        # input gate
-        i = tf.sigmoid(
-            tf.matmul(current_x, self.W_xi) + 
-            tf.matmul(prev_h, self.W_hi) + 
-            self.b_i)
-        # forget Gate
-        f = tf.sigmoid(
-            tf.matmul(current_x, self.W_xf) + 
-            tf.matmul(prev_h, self.W_hf) + 
-            self.b_f)
-        # output Gate
-        o = tf.sigmoid(
-            tf.matmul(current_x, self.W_xo) + 
-            tf.matmul(prev_h, self.W_ho) + 
-            self.b_o)
-        # new cell info
-        c = tf.tanh(
-            tf.matmul(current_x, self.W_xc) + 
-            tf.matmul(prev_h, self.W_hc) + 
-            self.b_c)
-        # current cell 
-        current_c = f*prev_c + i*c
-        # current hidden state
-        current_h = o*tf.tanh(current_c)
-        
-        return tf.stack([current_h, current_c])
-    
-    def all_steps(self):
-        # inputs shape : [n_sample, n_steps, D_input]
-        # outputs shape : [n_steps, n_sample, D_output]
-        hstates = tf.scan(fn=self.one_step,
-                          elems=self.incoming,
-                          initializer=self.previous_h_c_tuple,
-                          name='hstates')[:, 0, :, :]
-        return hstates
-
-
-# LSTM init and func
-def weight_init(shape):
-    initial = tf.random_uniform(shape,minval=-np.sqrt(5)*np.sqrt(1.0/shape[0]), maxval=np.sqrt(5)*np.sqrt(1.0/shape[0]))
-    return tf.Variable(initial, trainable=True)
-
-
-def zero_init(shape):
-    initial = tf.Variable(tf.zeros(shape))
-    return tf.Variable(initial, trainable=True)
-
-
-def orthogonal_initializer(shape, scale = 1.0):
-    scale = 1.0
-    flat_shape = (shape[0], np.prod(shape[1:]))
-    a = np.random.normal(0.0, 1.0, flat_shape)
-    u, _, v = np.linalg.svd(a, full_matrices=False)
-    q = u if u.shape == flat_shape else v
-    q = q.reshape(shape)                    # this needs to be corrected to float32
-    return tf.Variable(scale * q[:shape[0], :shape[1]], trainable=True, dtype=tf.float32)
-
-
-def bias_init(shape):
-    initial = tf.constant(0.01, shape=shape)
-    return tf.Variable(initial)
-
-
-def shufflelists(data):
-    ri = np.random.permutation(len(data))
-    data = [data[i] for i in ri]
-    return data
-
-
-# CNN init and func
-def weight_variable(shape):
-    initial = tf.truncated_normal(shape, stddev=0.1)
-    return tf.Variable(initial)
-
-
-def bias_variable(shape):
-    initial = tf.constant(0.1, shape=shape)
-    return tf.Variable(initial)
-
-
-def conv2d(x, W):
-    return tf.nn.conv2d(x, W, strides=[1, 1, 1, 1], padding='SAME')
-
-
-def max_pool_1x2(x):
-    return tf.nn.max_pool(x, ksize=[1, 1, 2, 1], strides=[1, 1, 2, 1], padding='SAME')
-
-
-def max_pool_2x2(x):
-    return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
-
-
-
 D_input = 512
 D_label = 4
 learning_rate = 7e-5
@@ -233,31 +207,7 @@ num_units = 1024
 inputs = tf.placeholder(tf.float32, [None, None, D_input], name="inputs")
 labels = tf.placeholder(tf.float32, [None, D_label], name="labels")
 
-# CNN part
-# 输入
-x_input = tf.reshape(inputs, [-1, 1, D_input, 1])
-
-# 第一个卷积层
-W_conv1 = weight_variable([1, 5, 1, 32])
-b_conv1 = bias_variable([32])
-h_conv1 = tf.nn.relu(conv2d(x_input, W_conv1) + b_conv1)
-h_pool1 = max_pool_1x2(h_conv1)
-
-# 第二个卷积层
-W_conv2 = weight_variable([1, 5, 32, 32])
-b_conv2 = bias_variable([32])
-h_conv2 = tf.nn.relu(conv2d(h_pool1, W_conv2) + b_conv2)
-h_pool2 = max_pool_1x2(h_conv2)
-
-# 密集链接层
-# 密集链接映射为256维，并作为LSTM的输入
-LSTM_input_dimension = 256
-W_fc1 = weight_variable([1 * 48 * 32, 256])
-b_fc1 = bias_variable([256])
-h_pool2_flat = tf.reshape(h_pool2, [-1, 1 * 48 * 32])
-LSTM_input = tf.nn.relu(tf.matmul(h_pool2_flat, W_fc1) + b_fc1)
-
-rnn_cell = LSTMcell(LSTM_input, LSTM_input_dimension, num_units, orthogonal_initializer)
+rnn_cell = LSTMcell(inputs, D_input, num_units, orthogonal_initializer)
 rnn_out = rnn_cell.all_steps()
 # reshape for output layer
 rnn = tf.reshape(rnn_out, [-1, num_units])
@@ -270,36 +220,44 @@ loss = -tf.reduce_mean(labels*tf.log(output))
 
 train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
+saver = tf.train.Saver()
+
 sess = tf.InteractiveSession()
 tf.global_variables_initializer().run()
+
+
 
 
 # 训练并记录
 def train_epoch(epoch):
     for k in range(epoch):
         train_shift = shufflelists(train)
+        accumulated_loss = 0
         for i in range(len(train)):
-            sess.run(train_step, feed_dict={inputs: train_shift[i][0], labels: train_shift[i][1]})
-        tl = 0
-        dl = 0
-        for i in range(len(test)):
-            dl += sess.run(loss, feed_dict={inputs: test[i][0], labels: test[i][1]})
-        for i in range(len(train)):
-            tl += sess.run(loss, feed_dict={inputs: train[i][0], labels: train[i][1]})
-
-        print(k, 'train:', round(tl/len(train), 3), '  test:', round(dl/len(test), 3))
-        count = 0
-        for j in range(len(test)):
-            pred = sess.run(output, feed_dict={inputs: test[j][0]})
-            pred_len = len(pred)
-            max_pred = list(pred[pred_len-1]).index(max(list(pred[pred_len-1])))
-            max_test = list(test[j][1][0]).index(max(list(test[j][1][0])))
-            if max_pred == max_test:
-                count += 1
-        print('test accuracy: ', round(count/len(test), 3))
+            train_loss, m_ = sess.run((loss, train_step), feed_dict={inputs: train_shift[i][0], labels: train_shift[i][1]})
+            # print(train_loss)
+            accumulated_loss += train_loss
+        print(k, 'train:', round(accumulated_loss / len(train), 3))
+        # tl = 0
+        # dl = 0
+        # for i in range(len(test)):
+        #     dl += sess.run(loss, feed_dict={inputs: test[i][0], labels: test[i][1]})
+        # for i in range(len(train)):
+        #     tl += sess.run(loss, feed_dict={inputs: train[i][0], labels: train[i][1]})
+        # print(k, 'train:', round(tl/len(train), 3), '  test:', round(dl/len(test), 3))
+    count = 0
+    for j in range(len(test)):
+        pred = sess.run(output, feed_dict={inputs: test[j][0]})
+        pred_len = len(pred)
+        max_pred = list(pred[pred_len-1]).index(max(list(pred[pred_len-1])))
+        max_test = list(test[j][1][0]).index(max(list(test[j][1][0])))
+        if max_pred == max_test:
+            count += 1
+    print('test accuracy: ', round(count/len(test), 3))
+    saver.save(sess, "params/lstm_amplitude_lwy.ckpt")
 
 
 t0 = time.time()
-train_epoch(10)
+train_epoch(20)
 t1 = time.time()
-print(" %f seconds" % round((t1 - t0), 2))
+print(" %f min" % round((t1 - t0)/60, 2))
