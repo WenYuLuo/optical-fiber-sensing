@@ -1,11 +1,12 @@
 from lstm_ofa_classify import *
 
-# 线路1
-dict = {0: '', 1: '', 2: '', 3: ''}
-# dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
-# dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
-dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路1/人工井内施工"
-dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路1/下雨告警"
+# # 线路1
+# dict = {0: '', 1: '', 2: '', 3: ''}
+# # dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
+# # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
+# dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路1/人工井内施工"
+# dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路1/下雨告警"
+# print('线路1 testing ...')
 
 # 线路2
 dict = {0: '', 1: '', 2: '', 3: ''}
@@ -13,6 +14,7 @@ dict[0] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线�
 # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
 dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路2/人工井内施工"
 dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路2/下雨"
+print('线路2 testing ...')
 
 test = []
 
@@ -26,6 +28,8 @@ for key in dict:
     for pathname in wav_files:
         wave_data, frameRate = read_wav.read_wav_file(pathname)
         wave_data = wave_data.T
+
+        wava_mean = float(np.sum(wave_data) / len(wave_data))
 
         ref_value = 2 ** 15 - 1
         wave_data = wave_data / ref_value  # wave幅值归一化
