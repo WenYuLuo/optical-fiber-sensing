@@ -3,6 +3,7 @@ import tensorflow as tf
 import time
 import read_wav
 from scipy import signal
+import matplotlib.pyplot as plt
 
 '''
 光纤振动拾音器音频分类
@@ -180,15 +181,18 @@ if __name__ == '__main__':
 
             wave_data = wave_data.T
 
-            wava_mean = float(np.sum(wave_data**2)/len(wave_data))
+            wava_mean = float(np.sqrt(np.sum(wave_data**2))/len(wave_data))
 
-            # ref_value = (2 ** 15 - 1) / wava_mean
-            wave_data = wave_data / wava_mean  # wave幅值归一化
+            ref_value = (2 ** 15 - 1) / wava_mean
+            wave_data = wave_data / ref_value  # wave幅值归一化
+
+            # plt.plot(wave_data)
+            # plt.show()
 
             nw = 512
             inc = 256
             win_fun = np.hamming(nw)
-            frames = enframe(wave_data[0], nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
+            frames = enframe(wave_data, nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
 
             frames = np.fft.fft(frames)
             frames = np.sqrt(frames.real**2 + frames.imag ** 2)
