@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 import time
 import read_wav
-
+from scipy import signal
 
 '''
 光纤振动拾音器音频分类
