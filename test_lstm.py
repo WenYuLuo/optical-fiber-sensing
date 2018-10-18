@@ -29,9 +29,10 @@ for key in dict:
         wave_data, frameRate = read_wav.read_wav_file(pathname)
         wave_data = wave_data.T
 
-        wava_mean = float(np.sum(wave_data) / len(wave_data))
+        wave_data = highpass(wave_data, frameRate, fl=1000)  # 高通滤波
+        wave_mean = float(np.sum(wave_data) / len(wave_data))
 
-        ref_value = 2 ** 15 - 1
+        ref_value = (2 ** 15 - 1) / wave_mean
         wave_data = wave_data / ref_value  # wave幅值归一化
 
         nw = 512

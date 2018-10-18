@@ -146,6 +146,15 @@ def shufflelists(data):
     return data
 
 
+def highpass(xn, fs, fl=1000):
+    if xn.ndim > 1:
+        xn = xn[:, 0]
+
+    Wn = fl / fs  # Convert 3 - dB frequency
+    b, a = signal.butter(5, Wn, 'highpass')
+    xn = signal.filtfilt(b, a, xn)
+    return xn
+
 # In[4]:
 if __name__ == '__main__':
 
@@ -168,9 +177,11 @@ if __name__ == '__main__':
             wave_data, frameRate = read_wav.read_wav_file(pathname)
             wave_data = wave_data.T
 
+            wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波
+
             wava_mean = float(np.sum(wave_data)/len(wave_data))
 
-            ref_value = 2 ** 15 - 1 / wava_mean
+            ref_value = (2 ** 15 - 1) / wava_mean
             wave_data = wave_data / ref_value  # wave幅值归一化
 
             nw = 512
