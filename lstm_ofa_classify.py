@@ -159,11 +159,18 @@ def highpass(xn, fs, fl=1000):
 # In[4]:
 if __name__ == '__main__':
 
+    # dict = {0: '', 1: '', 2: '', 3: ''}
+    # dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
+    # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
+    # dict[2] = "/media/fish/Elements/Project/光纤传感/光纤音频/井内人工动作"
+    # dict[3] = "/media/fish/Elements/Project/光纤传感/光纤音频/雨水流入井内冲击光缆"
+
+    # 去噪音频存储路径
     dict = {0: '', 1: '', 2: '', 3: ''}
-    dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
-    dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
-    dict[2] = "/media/fish/Elements/Project/光纤传感/光纤音频/井内人工动作"
-    dict[3] = "/media/fish/Elements/Project/光纤传感/光纤音频/雨水流入井内冲击光缆"
+    dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/布放光缆"
+    dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/机械施工"
+    dict[2] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/井内人工动作"
+    dict[3] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/雨水流入井内冲击光缆"
 
 
     train = [] #384
