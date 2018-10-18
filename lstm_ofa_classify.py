@@ -175,14 +175,15 @@ if __name__ == '__main__':
 
         for pathname in wav_files:
             wave_data, frameRate = read_wav.read_wav_file(pathname)
-            wave_data = wave_data.T
 
             wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波
 
-            wava_mean = float(np.sum(wave_data)/len(wave_data))
+            wave_data = wave_data.T
 
-            ref_value = (2 ** 15 - 1) / wava_mean
-            wave_data = wave_data / ref_value  # wave幅值归一化
+            wava_mean = float(np.sum(wave_data**2)/len(wave_data))
+
+            # ref_value = (2 ** 15 - 1) / wava_mean
+            wave_data = wave_data / wava_mean  # wave幅值归一化
 
             nw = 512
             inc = 256
