@@ -4,6 +4,9 @@ import time
 import read_wav
 from scipy import signal
 import matplotlib.pyplot as plt
+import webrtcvad
+
+
 
 '''
 光纤振动拾音器音频分类
@@ -156,6 +159,52 @@ def highpass(xn, fs, fl=1000):
     xn = signal.filtfilt(b, a, xn)
     return xn
 
+
+def vad_process(data):
+    fake_fs = 8000 # 假设采样8khz
+    duration = 30 # 时长30ms
+    data_len = fake_fs * duration / 1000
+    stream_list = pcm_stream(data, data_len) # pcm 分帧
+    is_slience = np.zeros([1, len(stream_list)])
+    vad = webrtcvad.Vad(2)
+    for i in range(len(stream_list)):
+        is_active = vad.is_speech(stream[i], fake_fs)
+        is_slience[i] = 0 if is_active else 1
+    index_active = np.where(is_slience == 0)[0]
+    is_begin = False
+    start_index = index_active[0]
+    active_list = []
+    for i in range(len(index_active)):
+        if not is_begin:
+            start_index = index_active[i]
+            is_begin = True
+        if i+1 >= len(index_active):
+            end_index = index_active[i]
+            active_list.append((start_index*data_len, (end_index+1)*data_len))
+            break
+        if index_active[i+1] - index_active[i] > 1:
+            end_index = index_active[i]
+            active_list.append((start_index*data_len, (end_index+1)*data_len))
+            is_begin = False
+        else:
+            continue
+    return active_list
+
+
+def pcm_stream(data, data_len):
+    stream = []
+    length = len(data)
+    i = 0
+    while True:
+        if (i+1)*data_len > length:
+            break
+        clip = data[i*data_len:(i+1)*data_len, :]
+        clip = clip.tobytes()
+        stream.append(clip)
+    return stream
+
+
+
 # In[4]:
 if __name__ == '__main__':
 
@@ -186,6 +235,8 @@ if __name__ == '__main__':
 
             wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波(若为多通道仅使用第一通道数据)
 
+            active_pos_list = vad_process(wave_data)
+
             wave_data = wave_data.T
 
             wava_mean = float(np.sqrt(np.sum(wave_data**2))/len(wave_data))
@@ -196,29 +247,36 @@ if __name__ == '__main__':
             # plt.plot(wave_data)
             # plt.show()
 
-            nw = 512
-            inc = 256
-            win_fun = np.hamming(nw)
-            frames = enframe(wave_data, nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
+            for pos in active_pos_list:
+                # if pos[0] != 0:
+                #
+                if pos[1] - pos[0] < 1024:
+                    continue
 
-            frames = np.fft.fft(frames)
-            frames = np.sqrt(frames.real**2 + frames.imag ** 2)
-            frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
-            frames = list(frames)
+                clip_data = wave_data[pos[0]:pos[1]]
 
-            label = [0, 0, 0, 0]
-            label[key] = 1
-            label = np.array([[label]])
-            label = list(label)
-            sample = frames + label
+                nw = 512
+                inc = 256
+                win_fun = np.hamming(nw)
+                frames = enframe(clip_data, nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
 
-            count += 1
+                frames = np.fft.fft(frames)
+                frames = np.sqrt(frames.real**2 + frames.imag ** 2)
+                frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
+                frames = list(frames)
 
-            if count % 5 == 0:
-                test.append(sample)
-            else:
-                train.append(sample)
+                label = [0, 0, 0, 0]
+                label[key] = 1
+                label = np.array([[label]])
+                label = list(label)
+                sample = frames + label
 
+                count += 1
+
+                if count % 5 == 0:
+                    test.append(sample)
+                else:
+                    train.append(sample)
 
     print('num of train sequences:%s' %len(train))  # 384
     print('num of test sequences:%s' %len(test))    # 96
