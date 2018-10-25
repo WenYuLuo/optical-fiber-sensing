@@ -4,16 +4,16 @@ from lstm_ofa_classify import *
 dict = {0: '', 1: '', 2: '', 3: ''}
 # dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
 # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
-dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路1/人工井内施工"
-dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路1/下雨告警"
+dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/人工井内施工"
+dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/下雨告警"
 print('线路1 testing ...')
 
 # # 线路2
 # dict = {0: '', 1: '', 2: '', 3: ''}
-# dict[0] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路2/放缆"
+# dict[0] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/放缆"
 # # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
-# dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路2/人工井内施工"
-# dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本/线路2/下雨"
+# dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/人工井内施工"
+# dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/下雨"
 # print('线路2 testing ...')
 
 test = []
@@ -94,7 +94,13 @@ for j in range(len(test)):
     pred = sess.run(output, feed_dict={inputs: test[j][0]})
     pred_len = len(pred)
     max_pred = list(pred[pred_len - 1]).index(max(list(pred[pred_len - 1])))
+    pred_list = []
+    for pre_x in pred:
+        max_pre_x = list(pre_x).index(max(list(pre_x)))
+        pred_list.append(max_pre_x)
     max_test = list(test[j][1][0]).index(max(list(test[j][1][0])))
+    print(pred_list)
+    print('ground truth:', max_test)
     if max_pred == max_test:
         count += 1
 print('correct classified audio: %d, total: %d, test accuracy: %f' % (count, len(test), round(count / len(test), 3)))

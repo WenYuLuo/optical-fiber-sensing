@@ -159,7 +159,7 @@ def highpass(xn, fs, fl=1000):
 # In[4]:
 if __name__ == '__main__':
 
-    # dict = {0: '', 1: '', 2: '', 3: ''}
+    # d bict = {0: '', 1: '', 2: '', 3: ''}
     # dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
     # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
     # dict[2] = "/media/fish/Elements/Project/光纤传感/光纤音频/井内人工动作"
@@ -184,7 +184,7 @@ if __name__ == '__main__':
         for pathname in wav_files:
             wave_data, frameRate = read_wav.read_wav_file(pathname)
 
-            wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波
+            wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波(若为多通道仅使用第一通道数据)
 
             wave_data = wave_data.T
 
@@ -227,7 +227,7 @@ if __name__ == '__main__':
 
     D_input = 512
     D_label = 4
-    learning_rate = 7e-5
+    learning_rate = 1e-4
     num_units = 1024
 
     inputs = tf.placeholder(tf.float32, [None, None, D_input], name="inputs")
@@ -284,6 +284,6 @@ if __name__ == '__main__':
 
 
     t0 = time.time()
-    train_epoch(20)
+    train_epoch(30)
     t1 = time.time()
     print(" %f min" % round((t1 - t0)/60, 2))
