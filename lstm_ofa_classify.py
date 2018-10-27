@@ -161,16 +161,33 @@ def highpass(xn, fs, fl=1000):
 
 
 def vad_process(data):
-    fake_fs = 8000 # 假设采样8khz
-    duration = 30 # 时长30ms
-    data_len = int(fake_fs * duration / 1000)
-    stream_list = pcm_stream(data, data_len) # pcm 分帧
-    is_slience = [0] * len(stream_list)
-    vad = webrtcvad.Vad(2)
-    for i in range(len(stream_list)):
-        is_active = vad.is_speech(stream_list[i], fake_fs)
-        is_slience[i] = 0 if is_active else 1
-    index_active = np.where(is_slience == 0)
+    data_len = 1024
+    length = len(data)
+    energy_arr = []
+    i = 0
+    while True:
+        if (i+1)*data_len > length:
+            break
+        clip = data[i*data_len:(i+1)*data_len]
+        energy = np.sqrt(np.sum(clip**2))
+        energy_arr.append(energy)
+    energy_arr = np.array(energy_arr)
+    energy_mean = np.mean(energy_arr)
+    energy_std = np.std(energy_arr, ddof=1)
+    threshold = energy_mean - energy_std
+
+
+    # fake_fs = 8000 # 假设采样8khz
+    # duration = 30 # 时长30ms
+    # data_len = int(fake_fs * duration / 1000)
+    # stream_list = pcm_stream(data, data_len) # pcm 分帧
+    # is_slience = [0] * len(stream_list)
+    # vad = webrtcvad.Vad(2)
+    # for i in range(len(stream_list)):
+    #     is_active = vad.is_speech(stream_list[i], fake_fs)
+    #     is_slience[i] = 0 if is_active else 1
+
+    index_active = np.where(energy_arr > threshold)[0]
     is_begin = False
     start_index = index_active[0]
     active_list = []
@@ -237,8 +254,6 @@ if __name__ == '__main__':
 
             wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波(若为多通道仅使用第一通道数据)
 
-
-
             active_pos_list = vad_process(wave_data)
 
             wave_data = wave_data.T
@@ -254,8 +269,9 @@ if __name__ == '__main__':
             for pos in active_pos_list:
                 # if pos[0] != 0:
                 #
-                if pos[1] - pos[0] < 1024:
-                    continue
+
+                # if pos[1] - pos[0] < 1024:
+                #     continue
 
                 detected_visual[pos[0]:pos[1]] = 2000
 
