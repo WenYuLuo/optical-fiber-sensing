@@ -163,14 +163,14 @@ def highpass(xn, fs, fl=1000):
 def vad_process(data):
     fake_fs = 8000 # 假设采样8khz
     duration = 30 # 时长30ms
-    data_len = fake_fs * duration / 1000
+    data_len = int(fake_fs * duration / 1000)
     stream_list = pcm_stream(data, data_len) # pcm 分帧
-    is_slience = np.zeros([1, len(stream_list)])
+    is_slience = [0] * len(stream_list)
     vad = webrtcvad.Vad(2)
     for i in range(len(stream_list)):
-        is_active = vad.is_speech(stream[i], fake_fs)
+        is_active = vad.is_speech(stream_list[i], fake_fs)
         is_slience[i] = 0 if is_active else 1
-    index_active = np.where(is_slience == 0)[0]
+    index_active = np.where(is_slience == 0)
     is_begin = False
     start_index = index_active[0]
     active_list = []
@@ -198,9 +198,11 @@ def pcm_stream(data, data_len):
     while True:
         if (i+1)*data_len > length:
             break
-        clip = data[i*data_len:(i+1)*data_len, :]
+        clip = data[i*data_len:(i+1)*data_len]*100
+        clip = clip.astype(np.int16)
         clip = clip.tobytes()
         stream.append(clip)
+        i += 1
     return stream
 
 
@@ -235,6 +237,8 @@ if __name__ == '__main__':
 
             wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波(若为多通道仅使用第一通道数据)
 
+
+
             active_pos_list = vad_process(wave_data)
 
             wave_data = wave_data.T
@@ -246,12 +250,14 @@ if __name__ == '__main__':
 
             # plt.plot(wave_data)
             # plt.show()
-
+            detected_visual = np.zeros_like(wave_data)
             for pos in active_pos_list:
                 # if pos[0] != 0:
                 #
                 if pos[1] - pos[0] < 1024:
                     continue
+
+                detected_visual[pos[0]:pos[1]] = 2000
 
                 clip_data = wave_data[pos[0]:pos[1]]
 
@@ -277,6 +283,20 @@ if __name__ == '__main__':
                     test.append(sample)
                 else:
                     train.append(sample)
+            time = np.arange(0, wave_data.shape[0])
+
+            import pylab as pl
+            verbose = True
+            if verbose:
+                pl.subplot(211)
+                spec = wave_data.tolist()
+                pl.specgram(spec, Fs=22050, scale_by_freq=True, sides='default')
+                pl.subplot(212)
+                pl.plot(time, wave_data)
+                pl.plot(time, detected_visual)
+                pl.title('high pass filter')
+                pl.xlabel('time')
+                pl.show()
 
     print('num of train sequences:%s' %len(train))  # 384
     print('num of test sequences:%s' %len(test))    # 96
