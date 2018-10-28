@@ -223,6 +223,23 @@ def pcm_stream(data, data_len):
     return stream
 
 
+def data_enframe(data, label_key):
+    nw = 512
+    inc = 256
+    win_fun = np.hamming(nw)
+    frames = enframe(clip_data, nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
+
+    frames = np.fft.fft(frames)
+    frames = np.sqrt(frames.real ** 2 + frames.imag ** 2)
+    frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
+    frames = list(frames)
+
+    label = [0, 0, 0, 0, 0]
+    label[label_key] = 1
+    label = np.array([[label]])
+    label = list(label)
+    sample = frames + label
+    return sample
 
 # In[4]:
 if __name__ == '__main__':
@@ -239,13 +256,14 @@ if __name__ == '__main__':
     dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/机械施工"
     dict[2] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/井内人工动作"
     dict[3] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/雨水流入井内冲击光缆"
-
+    slience_label = 4
 
     train = [] #384
     test = [] #96
 
     for key in dict:
         count = 0
+        slience_count = 0
         # key = 2
         print(dict[key])
         wav_files = read_wav.list_wav_files(dict[key])
@@ -270,41 +288,47 @@ if __name__ == '__main__':
             # plt.plot(wave_data)
             # plt.show()
             detected_visual = np.zeros_like(wave_data)
-            for pos in active_pos_list:
+            for i in range(len(active_pos_list)):
                 # if pos[0] != 0:
                 #
 
                 # if pos[1] - pos[0] < 1024:
                 #     continue
-
+                pos = active_pos_list[i]
                 detected_visual[pos[0]:pos[1]] = 1
                 clip_data = wave_data[pos[0]:pos[1]]
-                nw = 512
-                inc = 256
-                win_fun = np.hamming(nw)
-                frames = enframe(clip_data, nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
-
-                count += frames.shape[0]
-
-                frames = np.fft.fft(frames)
-                frames = np.sqrt(frames.real**2 + frames.imag ** 2)
-                frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
-                frames = list(frames)
-
-                label = [0, 0, 0, 0]
-                label[key] = 1
-                label = np.array([[label]])
-                label = list(label)
-                sample = frames + label
-
-
-
+                sample = data_enframe(clip_data, key)
+                count += sample[0].shape[0]
                 if count % 5 == 0:
                     test.append(sample)
                 else:
                     train.append(sample)
-        print(count)
 
+                if i == 0 and pos[0] != 0:
+                    # 起始静音段
+                    slience_start = 0
+                    slience_end = pos[0]
+                    clip_data = wave_data[slience_start:slience_end]
+                    sample = data_enframe(clip_data, slience_label)
+                    slience_count += sample[0].shape[0]
+                    if slience_count % 5 == 0:
+                        test.append(sample)
+                    else:
+                        train.append(sample)
+
+                if i+1 < len(active_pos_list):
+                    # 静音段
+                    slience_start = pos[1]
+                    slience_end = active_pos_list[i+1][0]
+                    clip_data = wave_data[slience_start:slience_end]
+                    sample = data_enframe(clip_data, slience_label)
+                    slience_count += sample[0].shape[0]
+                    if slience_count % 5 == 0:
+                        test.append(sample)
+                    else:
+                        train.append(sample)
+
+        print(count)
 
             # import pylab as pl
             # time = np.arange(0, wave_data.shape[0])
@@ -326,7 +350,7 @@ if __name__ == '__main__':
     print('shape of labels:', test[0][1].shape)     # (1,4)
 
     D_input = 512
-    D_label = 4
+    D_label = 5
     learning_rate = 1e-4
     num_units = 1024
 
@@ -350,9 +374,6 @@ if __name__ == '__main__':
 
     sess = tf.InteractiveSession()
     tf.global_variables_initializer().run()
-
-
-
 
     # 训练并记录
     def train_epoch(epoch):
@@ -384,6 +405,6 @@ if __name__ == '__main__':
 
 
     t0 = time.time()
-    train_epoch(20)
+    train_epoch(25)
     t1 = time.time()
     print(" %f min" % round((t1 - t0)/60, 2))

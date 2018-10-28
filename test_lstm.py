@@ -23,12 +23,18 @@ for key in dict:
     if dict[key] == '':
         continue
     count = 0
+    slience_count =0
     wav_files = read_wav.list_wav_files(dict[key])
 
     for pathname in wav_files:
         wave_data, frameRate = read_wav.read_wav_file(pathname)
 
-        wave_data = highpass(wave_data, frameRate, fl=1000)  # 高通滤波
+        wave_data = highpass(wave_data, frameRate, fl=1000)  # 高通滤波(若为多通道仅使用第一通道数据)
+
+        if key == 3:
+            active_pos_list = [[0, len(wave_data)]]
+        else:
+            active_pos_list = vad_process(wave_data)
 
         wave_data = wave_data.T
 
@@ -37,32 +43,47 @@ for key in dict:
         ref_value = (2 ** 15 - 1) / wava_mean
         wave_data = wave_data / ref_value  # wave幅值归一化
 
-        nw = 512
-        inc = 256
-        win_fun = np.hamming(nw)
-        frames = enframe(wave_data, nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
+        # plt.plot(wave_data)
+        # plt.show()
+        detected_visual = np.zeros_like(wave_data)
+        for i in range(len(active_pos_list)):
+            # if pos[0] != 0:
+            #
 
-        frames = np.fft.fft(frames)
-        frames = np.sqrt(frames.real**2 + frames.imag ** 2)
-        frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
-        frames = list(frames)
+            # if pos[1] - pos[0] < 1024:
+            #     continue
+            pos = active_pos_list[i]
+            detected_visual[pos[0]:pos[1]] = 1
+            clip_data = wave_data[pos[0]:pos[1]]
+            sample = data_enframe(clip_data, key)
+            count += sample[0].shape[0]
+            test.append(sample)
 
-        label = [0, 0, 0, 0]
-        label[key] = 1
-        label = np.array([[label]])
-        label = list(label)
-        sample = frames + label
+            if i == 0 and pos[0] != 0:
+                # 起始静音段
+                slience_start = 0
+                slience_end = pos[0]
+                clip_data = wave_data[slience_start:slience_end]
+                sample = data_enframe(clip_data, slience_label)
+                slience_count += sample[0].shape[0]
+                test.append(sample)
 
-        count += 1
-
-        test.append(sample)
+            if i + 1 < len(active_pos_list):
+                # 静音段
+                slience_start = pos[1]
+                slience_end = active_pos_list[i + 1][0]
+                clip_data = wave_data[slience_start:slience_end]
+                sample = data_enframe(clip_data, slience_label)
+                slience_count += sample[0].shape[0]
+                test.append(sample)
+    print(count)
 
 print('num of test sequences:%s' %len(test))    # 96
 print('shape of inputs:', test[0][0].shape)     # (1,1722,512)
 print('shape of labels:', test[0][1].shape)     # (1,4)
 
 D_input = 512
-D_label = 4
+D_label = 5
 learning_rate = 7e-5
 num_units = 1024
 
