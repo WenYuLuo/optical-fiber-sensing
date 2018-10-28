@@ -1,20 +1,20 @@
 from lstm_ofa_classify import *
 
-# # 线路1
-# dict = {0: '', 1: '', 2: '', 3: ''}
-# # dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
-# # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
-# dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/人工井内施工"
-# dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/下雨告警"
-# print('线路1 testing ...')
-
-# 线路2
+# 线路1
 dict = {0: '', 1: '', 2: '', 3: ''}
-# dict[0] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/放缆"
+# dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
+# dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
+dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/人工井内施工"
+dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/下雨告警"
+print('线路1 testing ...')
+
+# # 线路2
+# dict = {0: '', 1: '', 2: '', 3: ''}
+# # dict[0] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/放缆"
 # # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
 # dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/人工井内施工"
-dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/下雨"
-print('线路2 testing ...')
+# dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/下雨"
+# print('线路2 testing ...')
 
 test = []
 slience_label = 4
@@ -112,18 +112,25 @@ tf.global_variables_initializer().run()
 saver.restore(sess, "params/lstm_amplitude_lwy.ckpt")
 
 count = 0
+slience_count = 0
 for j in range(len(test)):
+    ground_truth = list(test[j][1][0]).index(max(list(test[j][1][0])))
+    if ground_truth == 4:
+        slience_count += 1
+        continue
     pred = sess.run(output, feed_dict={inputs: test[j][0]})
     pred_len = len(pred)
     # max_pred = list(pred[pred_len - 1]).index(max(list(pred[pred_len - 1])))
-    pred_list = np.zeros(5)
+    pred_list = np.zeros(4)
     for pre_x in pred:
         max_pre_x = list(pre_x).index(max(list(pre_x)))
+        if max_pre_x == 4:
+            continue
         pred_list[max_pre_x] += 1
-    max_pre = np.argmax(pred_list)
-    max_test = list(test[j][1][0]).index(max(list(test[j][1][0])))
+    max_pred = np.argmax(pred_list)
     print(pred_list)
-    print('ground truth:', max_test)
-    if max_pred == max_test:
+    print('ground truth:', ground_truth)
+    if max_pred == ground_truth:
         count += 1
-print('correct classified audio: %d, total: %d, test accuracy: %f' % (count, len(test), round(count / len(test), 3)))
+without_slience_total = len(test)-slience_count
+print('correct classified audio: %d, total: %d, test accuracy: %f' % (count, without_slience_total, round(count / without_slience_total, 3)))
