@@ -1,22 +1,23 @@
 from lstm_ofa_classify import *
 
-# 线路1
-dict = {0: '', 1: '', 2: '', 3: ''}
-# dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
-# dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
-dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/人工井内施工"
-dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/下雨告警"
-print('线路1 testing ...')
-
-# # 线路2
+# # 线路1
 # dict = {0: '', 1: '', 2: '', 3: ''}
+# # dict[0] = "/media/fish/Elements/Project/光纤传感/光纤音频/布放光缆"
+# # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
+# dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/人工井内施工"
+# dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路1/下雨告警"
+# print('线路1 testing ...')
+
+# 线路2
+dict = {0: '', 1: '', 2: '', 3: ''}
 # dict[0] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/放缆"
 # # dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频/机械施工"
 # dict[2] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/人工井内施工"
-# dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/下雨"
-# print('线路2 testing ...')
+dict[3] = "/media/fish/Elements/Project/光纤传感/2018.10.9音频样本_去噪/线路2/下雨"
+print('线路2 testing ...')
 
 test = []
+slience_label = 4
 
 for key in dict:
     print(dict[key])
@@ -56,7 +57,7 @@ for key in dict:
             detected_visual[pos[0]:pos[1]] = 1
             clip_data = wave_data[pos[0]:pos[1]]
             sample = data_enframe(clip_data, key)
-            count += sample[0].shape[0]
+            count += sample[0].shape[1]
             test.append(sample)
 
             if i == 0 and pos[0] != 0:
@@ -65,7 +66,7 @@ for key in dict:
                 slience_end = pos[0]
                 clip_data = wave_data[slience_start:slience_end]
                 sample = data_enframe(clip_data, slience_label)
-                slience_count += sample[0].shape[0]
+                slience_count += sample[0].shape[1]
                 test.append(sample)
 
             if i + 1 < len(active_pos_list):
@@ -74,7 +75,7 @@ for key in dict:
                 slience_end = active_pos_list[i + 1][0]
                 clip_data = wave_data[slience_start:slience_end]
                 sample = data_enframe(clip_data, slience_label)
-                slience_count += sample[0].shape[0]
+                slience_count += sample[0].shape[1]
                 test.append(sample)
     print(count)
 

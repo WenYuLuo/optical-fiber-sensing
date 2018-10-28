@@ -227,7 +227,7 @@ def data_enframe(data, label_key):
     nw = 512
     inc = 256
     win_fun = np.hamming(nw)
-    frames = enframe(clip_data, nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
+    frames = enframe(data, nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
 
     frames = np.fft.fft(frames)
     frames = np.sqrt(frames.real ** 2 + frames.imag ** 2)
@@ -261,9 +261,11 @@ if __name__ == '__main__':
     train = [] #384
     test = [] #96
 
+    slience_count = 0
+
     for key in dict:
         count = 0
-        slience_count = 0
+
         # key = 2
         print(dict[key])
         wav_files = read_wav.list_wav_files(dict[key])
@@ -297,8 +299,8 @@ if __name__ == '__main__':
                 pos = active_pos_list[i]
                 detected_visual[pos[0]:pos[1]] = 1
                 clip_data = wave_data[pos[0]:pos[1]]
-                sample = data_enframe(clip_data, key)
-                count += sample[0].shape[0]
+                sample = data_enframe(clip_data, key) # [段数,帧数,数据长度]
+                count += sample[0].shape[1]
                 if count % 5 == 0:
                     test.append(sample)
                 else:
@@ -310,7 +312,7 @@ if __name__ == '__main__':
                     slience_end = pos[0]
                     clip_data = wave_data[slience_start:slience_end]
                     sample = data_enframe(clip_data, slience_label)
-                    slience_count += sample[0].shape[0]
+                    slience_count += sample[0].shape[1]
                     if slience_count % 5 == 0:
                         test.append(sample)
                     else:
@@ -322,7 +324,7 @@ if __name__ == '__main__':
                     slience_end = active_pos_list[i+1][0]
                     clip_data = wave_data[slience_start:slience_end]
                     sample = data_enframe(clip_data, slience_label)
-                    slience_count += sample[0].shape[0]
+                    slience_count += sample[0].shape[1]
                     if slience_count % 5 == 0:
                         test.append(sample)
                     else:
@@ -343,6 +345,7 @@ if __name__ == '__main__':
             #     pl.title('high pass filter')
             #     pl.xlabel('time')
             #     pl.show()
+    print('静音帧数:', slience_count)
 
     print('num of train sequences:%s' %len(train))  # 384
     print('num of test sequences:%s' %len(test))    # 96
