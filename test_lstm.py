@@ -115,11 +115,12 @@ count = 0
 for j in range(len(test)):
     pred = sess.run(output, feed_dict={inputs: test[j][0]})
     pred_len = len(pred)
-    max_pred = list(pred[pred_len - 1]).index(max(list(pred[pred_len - 1])))
-    pred_list = []
+    # max_pred = list(pred[pred_len - 1]).index(max(list(pred[pred_len - 1])))
+    pred_list = np.zeros(5)
     for pre_x in pred:
         max_pre_x = list(pre_x).index(max(list(pre_x)))
-        pred_list.append(max_pre_x)
+        pred_list[max_pre_x] += 1
+    max_pre = np.argmax(pred_list)
     max_test = list(test[j][1][0]).index(max(list(test[j][1][0])))
     print(pred_list)
     print('ground truth:', max_test)
