@@ -171,11 +171,11 @@ def vad_process(data):
         clip = data[i*data_len:(i+1)*data_len]
         energy = np.sqrt(np.sum(clip**2))
         energy_arr.append(energy)
+        i += 1
     energy_arr = np.array(energy_arr)
     energy_mean = np.mean(energy_arr)
-    energy_std = np.std(energy_arr, ddof=1)
-    threshold = energy_mean - energy_std
-
+    # energy_std = np.std(energy_arr)
+    threshold = energy_mean * 0.8
 
     # fake_fs = 8000 # 假设采样8khz
     # duration = 30 # 时长30ms
@@ -245,8 +245,9 @@ if __name__ == '__main__':
     test = [] #96
 
     for key in dict:
-        print(dict[key])
         count = 0
+        # key = 2
+        print(dict[key])
         wav_files = read_wav.list_wav_files(dict[key])
 
         for pathname in wav_files:
@@ -254,7 +255,10 @@ if __name__ == '__main__':
 
             wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波(若为多通道仅使用第一通道数据)
 
-            active_pos_list = vad_process(wave_data)
+            if key == 3:
+                active_pos_list = [[0, len(wave_data)]]
+            else:
+                active_pos_list = vad_process(wave_data)
 
             wave_data = wave_data.T
 
@@ -273,14 +277,14 @@ if __name__ == '__main__':
                 # if pos[1] - pos[0] < 1024:
                 #     continue
 
-                detected_visual[pos[0]:pos[1]] = 2000
-
+                detected_visual[pos[0]:pos[1]] = 1
                 clip_data = wave_data[pos[0]:pos[1]]
-
                 nw = 512
                 inc = 256
                 win_fun = np.hamming(nw)
                 frames = enframe(clip_data, nw, inc, win_fun)  # (1722，512) 1722帧，每帧长度512，每帧间隔长度256
+
+                count += frames.shape[0]
 
                 frames = np.fft.fft(frames)
                 frames = np.sqrt(frames.real**2 + frames.imag ** 2)
@@ -293,26 +297,28 @@ if __name__ == '__main__':
                 label = list(label)
                 sample = frames + label
 
-                count += 1
+
 
                 if count % 5 == 0:
                     test.append(sample)
                 else:
                     train.append(sample)
-            time = np.arange(0, wave_data.shape[0])
+        print(count)
 
-            import pylab as pl
-            verbose = True
-            if verbose:
-                pl.subplot(211)
-                spec = wave_data.tolist()
-                pl.specgram(spec, Fs=22050, scale_by_freq=True, sides='default')
-                pl.subplot(212)
-                pl.plot(time, wave_data)
-                pl.plot(time, detected_visual)
-                pl.title('high pass filter')
-                pl.xlabel('time')
-                pl.show()
+
+            # import pylab as pl
+            # time = np.arange(0, wave_data.shape[0])
+            # verbose = True
+            # if verbose:
+            #     pl.subplot(211)
+            #     spec = wave_data.tolist()
+            #     pl.specgram(spec, Fs=22050, scale_by_freq=True, sides='default')
+            #     pl.subplot(212)
+            #     pl.plot(time, wave_data)
+            #     pl.plot(time, detected_visual)
+            #     pl.title('high pass filter')
+            #     pl.xlabel('time')
+            #     pl.show()
 
     print('num of train sequences:%s' %len(train))  # 384
     print('num of test sequences:%s' %len(test))    # 96
@@ -378,6 +384,6 @@ if __name__ == '__main__':
 
 
     t0 = time.time()
-    train_epoch(30)
+    train_epoch(20)
     t1 = time.time()
     print(" %f min" % round((t1 - t0)/60, 2))
