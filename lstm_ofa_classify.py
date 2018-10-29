@@ -261,6 +261,9 @@ if __name__ == '__main__':
     train = [] #384
     test = [] #96
 
+    slience_train = []
+    slience_test = []
+
     slience_count = 0
 
     for key in dict:
@@ -271,6 +274,11 @@ if __name__ == '__main__':
         wav_files = read_wav.list_wav_files(dict[key])
 
         for pathname in wav_files:
+
+            # balance
+            if count > 10000:
+                break
+
             wave_data, frameRate = read_wav.read_wav_file(pathname)
 
             wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波(若为多通道仅使用第一通道数据)
@@ -314,9 +322,9 @@ if __name__ == '__main__':
                     sample = data_enframe(clip_data, slience_label)
                     slience_count += sample[0].shape[1]
                     if slience_count % 5 == 0:
-                        test.append(sample)
+                        slience_test.append(sample)
                     else:
-                        train.append(sample)
+                        slience_train.append(sample)
 
                 if i+1 < len(active_pos_list):
                     # 静音段
@@ -326,11 +334,16 @@ if __name__ == '__main__':
                     sample = data_enframe(clip_data, slience_label)
                     slience_count += sample[0].shape[1]
                     if slience_count % 5 == 0:
-                        test.append(sample)
+                        slience_test.append(sample)
                     else:
-                        train.append(sample)
-
+                        slience_train.append(sample)
         print(count)
+
+    if len(slience_train) > 10000:
+        slience_train = shufflelists(slience_train)[:10000]
+        slience_test = shufflelists(slience_test)[:2000]
+    train += slience_train
+    test += slience_test
 
             # import pylab as pl
             # time = np.arange(0, wave_data.shape[0])
@@ -345,8 +358,8 @@ if __name__ == '__main__':
             #     pl.title('high pass filter')
             #     pl.xlabel('time')
             #     pl.show()
-    print('静音帧数:', slience_count)
-
+    print('总体静音帧数:', slience_count)
+    print('训练使用静音帧数:', len(slience_train))
     print('num of train sequences:%s' %len(train))  # 384
     print('num of test sequences:%s' %len(test))    # 96
     print('shape of inputs:', test[0][0].shape)     # (1,1722,512)
