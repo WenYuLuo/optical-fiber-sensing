@@ -392,6 +392,9 @@ if __name__ == '__main__':
 
     train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
+    correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(labels, 1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
+
     saver = tf.train.Saver()
 
     sess = tf.InteractiveSession()
@@ -401,12 +404,12 @@ if __name__ == '__main__':
     def train_epoch(epoch):
         for k in range(epoch):
             train_shift = shufflelists(train)
-            accumulated_loss = 0
+            accumulated_acc = 0
             for i in range(len(train)):
-                train_loss, m_ = sess.run((loss, train_step), feed_dict={inputs: train_shift[i][0], labels: train_shift[i][1]})
+                train_acc, m_ = sess.run((accuracy, train_step), feed_dict={inputs: train_shift[i][0], labels: train_shift[i][1]})
                 # print(train_loss)
-                accumulated_loss += train_loss
-            print(k, 'train:', accumulated_loss / len(train))
+                accumulated_acc += train_acc
+            print(k, 'train:', accumulated_acc / len(train))
             # tl = 0
             # dl = 0
             # for i in range(len(test)):
