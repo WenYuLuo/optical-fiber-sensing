@@ -276,7 +276,7 @@ if __name__ == '__main__':
         for pathname in wav_files:
 
             # balance
-            if count > 10000:
+            if count > 20000:
                 break
 
             wave_data, frameRate = read_wav.read_wav_file(pathname)
@@ -338,10 +338,16 @@ if __name__ == '__main__':
                     else:
                         slience_train.append(sample)
         print(count)
-
-    if len(slience_train) > 10000:
-        slience_train = shufflelists(slience_train)[:10000]
-        slience_test = shufflelists(slience_test)[:2000]
+    slience_train = shufflelists(slience_train)
+    slience_to_be_used_count = 0
+    index = 0
+    while True:
+        slience_to_be_used_count += slience_train[index][0].shape[1]
+        if slience_to_be_used_count > 20000:
+            break
+        index += 1
+    slience_train = slience_train[:index]
+    slience_test = shufflelists(slience_test)[:100]
     train += slience_train
     test += slience_test
 
@@ -359,7 +365,7 @@ if __name__ == '__main__':
             #     pl.xlabel('time')
             #     pl.show()
     print('总体静音帧数:', slience_count)
-    print('训练使用静音帧数:', len(slience_train))
+    print('训练使用静音帧数:', slience_to_be_used_count)
     print('num of train sequences:%s' %len(train))  # 384
     print('num of test sequences:%s' %len(test))    # 96
     print('shape of inputs:', test[0][0].shape)     # (1,1722,512)
@@ -400,7 +406,7 @@ if __name__ == '__main__':
                 train_loss, m_ = sess.run((loss, train_step), feed_dict={inputs: train_shift[i][0], labels: train_shift[i][1]})
                 # print(train_loss)
                 accumulated_loss += train_loss
-            print(k, 'train:', round(accumulated_loss / len(train), 3))
+            print(k, 'train:', accumulated_loss / len(train))
             # tl = 0
             # dl = 0
             # for i in range(len(test)):
@@ -421,6 +427,6 @@ if __name__ == '__main__':
 
 
     t0 = time.time()
-    train_epoch(25)
+    train_epoch(50)
     t1 = time.time()
     print(" %f min" % round((t1 - t0)/60, 2))
