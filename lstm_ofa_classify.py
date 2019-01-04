@@ -188,23 +188,31 @@ def vad_process(data):
     #     is_slience[i] = 0 if is_active else 1
 
     index_active = np.where(energy_arr > threshold)[0]
-    is_begin = False
-    start_index = index_active[0]
     active_list = []
+    # is_begin = False
+    # start_index = index_active[0]
+    # for i in range(len(index_active)):
+    #     if not is_begin:
+    #         start_index = index_active[i]
+    #         is_begin = True
+    #     if i+1 >= len(index_active):
+    #         end_index = index_active[i]
+    #         active_list.append((start_index*data_len, (end_index+1)*data_len))
+    #         break
+    #     if index_active[i+1] - index_active[i] > 1:
+    #         end_index = index_active[i]
+    #         active_list.append((start_index*data_len, (end_index+1)*data_len))
+    #         is_begin = False
+    #     else:
+    #         continue
+
     for i in range(len(index_active)):
-        if not is_begin:
-            start_index = index_active[i]
-            is_begin = True
-        if i+1 >= len(index_active):
-            end_index = index_active[i]
-            active_list.append((start_index*data_len, (end_index+1)*data_len))
-            break
-        if index_active[i+1] - index_active[i] > 1:
-            end_index = index_active[i]
-            active_list.append((start_index*data_len, (end_index+1)*data_len))
-            is_begin = False
-        else:
+        start_index = index_active[i]
+        # 第一帧和最后一帧不计入
+        if start_index == 0 or start_index >= len(energy_arr) - 1:
             continue
+        active_list.append((start_index * data_len - 512, (start_index + 1) * data_len + 512))
+
     return active_list
 
 
@@ -231,15 +239,27 @@ def data_enframe(data, label_key):
 
     frames = np.fft.fft(frames)
     frames = np.sqrt(frames.real ** 2 + frames.imag ** 2)
+
+    frames = frames[:, :int(nw/2)]
+
+    # frames = energy_normalize(frames)
+
     frames = np.expand_dims(np.expand_dims(frames, axis=0), axis=0)
     frames = list(frames)
 
-    label = [0, 0, 0, 0, 0]
+    label = [0, 0, 0, 0]
     label[label_key] = 1
     label = np.array([[label]])
     label = list(label)
     sample = frames + label
     return sample
+
+
+def energy_normalize(xs):
+    energy = np.sqrt(np.sum(xs ** 2, 1))
+    for i in range(energy.shape[0]):
+        xs[i] /= energy[i]
+    return xs
 
 # In[4]:
 if __name__ == '__main__':
@@ -256,43 +276,52 @@ if __name__ == '__main__':
     dict[1] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/机械施工"
     dict[2] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/井内人工动作"
     dict[3] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/雨水流入井内冲击光缆"
-    slience_label = 4
+    # dict[4] = "/media/fish/Elements/Project/光纤传感/光纤音频_去噪/静音"
+    # slience_label = 4
 
     train = [] #384
     test = [] #96
 
-    slience_train = []
-    slience_test = []
+    num_clips = 25000
 
-    slience_count = 0
+    # slience_train = []
+    # slience_test = []
+    #
+    # slience_count = 0
 
     for key in dict:
-        count = 0
+        current_train = []
+        current_test = []
 
+        count = 0
+        if dict[key] == '':
+            continue
         # key = 2
         print(dict[key])
         wav_files = read_wav.list_wav_files(dict[key])
 
         for pathname in wav_files:
 
-            # balance
-            if count > 20000:
-                break
+            # # balance
+            # if count > 30000:
+            #     break
 
             wave_data, frameRate = read_wav.read_wav_file(pathname)
 
             wave_data = highpass(wave_data, frameRate, fl=1000) # 高通滤波(若为多通道仅使用第一通道数据)
 
-            if key == 3:
-                active_pos_list = [[0, len(wave_data)]]
-            else:
-                active_pos_list = vad_process(wave_data)
+            # if key == 3 or 4:
+            #     active_pos_list = [[0, len(wave_data)]]
+            # else:
+            #     active_pos_list = vad_process(wave_data)
+
+            active_pos_list = vad_process(wave_data)
 
             wave_data = wave_data.T
 
             wava_mean = float(np.sqrt(np.sum(wave_data**2))/len(wave_data))
 
-            ref_value = (2 ** 15 - 1) / wava_mean
+            ref_value = (2 ** 12 - 1) / wava_mean
             wave_data = wave_data / ref_value  # wave幅值归一化
 
             # plt.plot(wave_data)
@@ -307,49 +336,36 @@ if __name__ == '__main__':
                 pos = active_pos_list[i]
                 detected_visual[pos[0]:pos[1]] = 1
                 clip_data = wave_data[pos[0]:pos[1]]
+                clip_data = energy_normalize(clip_data.reshape((1, 2048)))[0]
                 sample = data_enframe(clip_data, key) # [段数,帧数,数据长度]
-                count += sample[0].shape[1]
+                count += 1
                 if count % 5 == 0:
-                    test.append(sample)
+                    current_test.append(sample)
                 else:
-                    train.append(sample)
-
-                if i == 0 and pos[0] != 0:
-                    # 起始静音段
-                    slience_start = 0
-                    slience_end = pos[0]
-                    clip_data = wave_data[slience_start:slience_end]
-                    sample = data_enframe(clip_data, slience_label)
-                    slience_count += sample[0].shape[1]
-                    if slience_count % 5 == 0:
-                        slience_test.append(sample)
-                    else:
-                        slience_train.append(sample)
-
-                if i+1 < len(active_pos_list):
-                    # 静音段
-                    slience_start = pos[1]
-                    slience_end = active_pos_list[i+1][0]
-                    clip_data = wave_data[slience_start:slience_end]
-                    sample = data_enframe(clip_data, slience_label)
-                    slience_count += sample[0].shape[1]
-                    if slience_count % 5 == 0:
-                        slience_test.append(sample)
-                    else:
-                        slience_train.append(sample)
-        print(count)
-    slience_train = shufflelists(slience_train)
-    slience_to_be_used_count = 0
-    index = 0
-    while True:
-        slience_to_be_used_count += slience_train[index][0].shape[1]
-        if slience_to_be_used_count > 20000:
-            break
-        index += 1
-    slience_train = slience_train[:index]
-    slience_test = shufflelists(slience_test)[:100]
-    train += slience_train
-    test += slience_test
+                    current_train.append(sample)
+                # if i == 0 and pos[0] != 0:
+                #     # 起始静音段
+                #     slience_start = 0
+                #     slience_end = pos[0]
+                #     clip_data = wave_data[slience_start:slience_end]
+                #     sample = data_enframe(clip_data, slience_label)
+                #     slience_count += sample[0].shape[1]
+                #     if slience_count % 5 == 0:
+                #         slience_test.append(sample)
+                #     else:
+                #         slience_train.append(sample)
+                #
+                # if i+1 < len(active_pos_list):
+                #     # 静音段
+                #     slience_start = pos[1]
+                #     slience_end = active_pos_list[i+1][0]
+                #     clip_data = wave_data[slience_start:slience_end]
+                #     sample = data_enframe(clip_data, slience_label)
+                #     slience_count += sample[0].shape[1]
+                #     if slience_count % 5 == 0:
+                #         slience_test.append(sample)
+                #     else:
+                #         slience_train.append(sample)
 
             # import pylab as pl
             # time = np.arange(0, wave_data.shape[0])
@@ -364,17 +380,53 @@ if __name__ == '__main__':
             #     pl.title('high pass filter')
             #     pl.xlabel('time')
             #     pl.show()
-    print('总体静音帧数:', slience_count)
-    print('训练使用静音帧数:', slience_to_be_used_count)
+        print('实际提取段数：', count)
+        current_train = shufflelists(current_train)
+        current_test = shufflelists(current_test)
+        train_len = len(current_train)
+        test_len = len(current_test)
+        while count < num_clips:
+            if count % 5 == 0:
+                index = count % test_len
+                temp = current_test[index]
+                current_test.append(temp)
+            else:
+                index = count % train_len
+                temp = current_train[index]
+                current_train.append(temp)
+            count += 1
+        else:
+            current_train = current_train[:int(num_clips * 4 / 5)]
+            current_test = current_train[:int(num_clips / 5)]
+        print('重复采样至 %d 段数.' % (len(current_test)+len(current_train)))
+        train += current_train
+        test += current_test
+
+    # slience_train = shufflelists(slience_train)
+    # slience_to_be_used_count = 0
+    # index = 0
+    # while True:
+    #     slience_to_be_used_count += slience_train[index][0].shape[1]
+    #     if slience_to_be_used_count > 20000:
+    #         break
+    #     index += 1
+    # slience_train = slience_train[:index]
+    # slience_test = shufflelists(slience_test)[:100]
+    # train += slience_train
+    # test += slience_test
+
+
+    # print('总体静音帧数:', slience_count)
+    # print('训练使用静音帧数:', slience_to_be_used_count)
     print('num of train sequences:%s' %len(train))  # 384
     print('num of test sequences:%s' %len(test))    # 96
     print('shape of inputs:', test[0][0].shape)     # (1,1722,512)
     print('shape of labels:', test[0][1].shape)     # (1,4)
 
-    D_input = 512
-    D_label = 5
+    D_input = 256
+    D_label = 4
     learning_rate = 1e-4
-    num_units = 1024
+    num_units = 256
 
     inputs = tf.placeholder(tf.float32, [None, None, D_input], name="inputs")
     labels = tf.placeholder(tf.float32, [None, D_label], name="labels")
@@ -430,6 +482,6 @@ if __name__ == '__main__':
 
 
     t0 = time.time()
-    train_epoch(50)
+    train_epoch(30)
     t1 = time.time()
     print(" %f min" % round((t1 - t0)/60, 2))
