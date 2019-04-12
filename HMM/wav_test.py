@@ -1,10 +1,13 @@
-from hmm_optical_sensing import *
-import common
+import sys
+sys.path.append("..")
+from myModule.hmm_optical_sensing import *
+from myModule import common
+import numpy as np
 
 
 def load_audio(path):
-    seg = 2 # 2s分段
-    nw = 2048 # 帧长约23ms*4
+    seg = 4 # 2s分段
+    nw = 1024 # 帧长约23ms*4
     n_mfcc = 32  # mfcc 维数
 
     folder_list = common.list_files(path)
@@ -53,7 +56,7 @@ def main(arg):
     """
     data_dict = load_audio(arg)
 
-    save_file = 'hmms_model_200.npy'
+    save_file = '..\\hmms_model_4s_1024.npy'
     hmms_model = hmms()
     hmms_model.load_model(save_file)
 
@@ -80,5 +83,6 @@ def main(arg):
 if __name__ == '__main__':
     # main('G:\\Project\\光纤传感\\2018.10.9音频样本\\线路1')
     # main('G:\\Project\\光纤传感\\2018.10.9音频样本\\线路2')
-    main('G:\\Project\\光纤传感\\音频集合')
+    # main('G:\\Project\\光纤传感\\音频集合')
+    main('E:\DailyResearch\Project\Yang\gmm_hmm\剪辑素材')
 

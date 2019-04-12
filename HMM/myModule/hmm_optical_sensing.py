@@ -1,6 +1,9 @@
+__all__ = ['load_optical_data', 'shuffle_list', 'enframe_and_feature_extract', 'dataObejct', 'hmms', 'reshape_data']
+
 import librosa
 from hmmlearn import hmm
-import common
+from myModule import common
+# import common
 import random
 import numpy as np
 import os
@@ -69,30 +72,30 @@ def load_optical_data(path, seg, nw, n_mfcc):
         train_list.append(train_samples)
         test_list.append(test_samples)
 
-    if max_frame_index == -1:
-        raise ValueError('the max frame index is not updated!(for data balance)')
-
-    print('最大帧数：%d' % train_frame_num_list[max_frame_index])
-
-    # 样本平衡
-    for i in range(len(list_folders)):
-        if i == max_frame_index:
-            continue
-
-        # 抽取样本，添加随机offset(0,256),(256,512)分帧
-        instance = dataObejct()
-        ind = 0
-        total_audio = train_list[i].get_num()
-        while train_frame_num_list[i] < max_frame_num_train:
-            index = ind % total_audio
-            samples = train_list[i].origin[index]
-            offset = random.randrange(1, nw * 2)
-            new_seg_mfcc, new_frame_num = enframe_and_feature_extract(samples[offset:], seg, nw, fs, n_mfcc)
-            instance.append(audio_name=train_list[i].audio_name[index], origin=samples[offset:], frame=new_seg_mfcc, frame_num=new_frame_num)
-            train_frame_num_list[i] += sum(new_frame_num)
-            ind += 1
-
-        train_list[i].appends(instance)
+    # if max_frame_index == -1:
+    #     raise ValueError('the max frame index is not updated!(for data balance)')
+    #
+    # print('最大帧数：%d' % train_frame_num_list[max_frame_index])
+    #
+    # # 样本平衡
+    # for i in range(len(list_folders)):
+    #     if i == max_frame_index:
+    #         continue
+    #
+    #     # 抽取样本，添加随机offset(0,256),(256,512)分帧
+    #     instance = dataObejct()
+    #     ind = 0
+    #     total_audio = train_list[i].get_num()
+    #     while train_frame_num_list[i] < max_frame_num_train:
+    #         index = ind % total_audio
+    #         samples = train_list[i].origin[index]
+    #         offset = random.randrange(1, nw * 2)
+    #         new_seg_mfcc, new_frame_num = enframe_and_feature_extract(samples[offset:], seg, nw, fs, n_mfcc)
+    #         instance.append(audio_name=train_list[i].audio_name[index], origin=samples[offset:], frame=new_seg_mfcc, frame_num=new_frame_num)
+    #         train_frame_num_list[i] += sum(new_frame_num)
+    #         ind += 1
+    #
+    #     train_list[i].appends(instance)
 
     return train_list, test_list
 
@@ -212,7 +215,7 @@ class dataObejct:
 
 
 class hmms:
-    def __init__(self, n_components=0, n_mixs=0, n_iter=0):
+    def __init__(self, n_components=None, n_mixs=None, n_iter=None):
         self.n_components = n_components
         self.n_mixs = n_mixs
         self.n_iter = n_iter
@@ -234,8 +237,8 @@ class hmms:
         for i in range(len(train_list)):
             if name_list is not None:
                 print('\t训练%s模型...'%name_list[i])
-            model = hmm.GMMHMM(n_components=self.n_components,
-                               n_mix=self.n_mixs,
+            model = hmm.GMMHMM(n_components=self.n_components[i],
+                               n_mix=self.n_mixs[i],
                                covariance_type="diag")
             model.n_iter = self.n_iter
             model.fit(train_list[i], length_list[i])
@@ -262,6 +265,32 @@ class hmms:
         scores = np.array(scores)
         predicts = np.argmax(scores, axis=0)
         return predicts
+
+    def predict_wav(self, wavname, seg, nw, n_mfcc):
+        wav_data, fs = common.read_wav_file(wavname)
+        # 多通道仅取一通道
+        if wav_data.ndim > 1:
+            wav_data = wav_data[:, 0]
+        wav_data = wav_data.T
+        ref_value = 2 ** 12 - 1
+        wav_data = wav_data / ref_value  # wave幅值归一化
+
+        filter_data = common.butter_worth_filter(wav_data, cutoff=1000, fs=fs, btype='high', N=8)
+
+        seg_mfcc, frame_num = enframe_and_feature_extract(filter_data, seg, nw, fs, n_mfcc)
+
+        predicts = self.batch_predict(seg_mfcc, frame_num)
+
+        count = np.bincount(predicts)
+
+        major = np.argmax(count)
+
+        if self.model_name[major] == '背景音':
+            count[major] = 0
+
+        major = np.argmax(count)
+
+        return major
 
     def save_model(self, filename):
         x = filename.split('.')
@@ -326,21 +355,21 @@ def reshape_data(data_list, n_mfcc):
 
 def main():
     path = 'E:\DailyResearch\Project\杨老师\gmm_hmm\剪辑素材'
-    seg = 2 # 2s分段
-    nw = 2048 # 帧长约23ms*4
+    seg = 5 # 4s分段
+    nw = 512 # 帧长约23ms*4
     n_mfcc = 32  # mfcc 维数
     train_list, test_list = load_optical_data(path, seg=seg, nw=nw, n_mfcc=n_mfcc)
 
     frame_list, length_list, name_list = reshape_data(train_list, n_mfcc)
 
     # 创建并初始化hmm模型
-    n_components = 4
-    n_mixs = 4
+    n_components = [8, 4, 4, 4, 4]
+    n_mixs = [8, 4, 4, 4, 4]
     n_iter = 1000
     hmm_models = hmms(n_components=n_components, n_mixs=n_mixs, n_iter=n_iter)
     hmm_models.train(frame_list, length_list, name_list)
 
-    save_file = 'hmms_model_200.npy'
+    save_file = 'hmms_model_5s_512.npy'
     hmm_models.save_model(save_file)
 
     # train accuracy
