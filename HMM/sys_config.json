@@ -1,0 +1,43 @@
+{
+"src_path": "//音频源路径",
+"src_path": "D:\\tmp\\src",
+
+"dst_path": "//音频转存路径",
+"dst_path": "D:\\tmp\\dst", 
+
+"hmm_model":"//hmm模型文件",
+"hmm_model":"D:\\Python\\gmm_hmm\\myModule\\hmms_model_5s200_1024.npy",
+
+"hmm_param":"//分帧参数",
+"hmm_param":
+			{
+			"seg":"//音频分段时长（S）",
+			"seg":4,
+			
+			"nw":"//帧长",
+			"nw":1024,
+			
+			"n_mfcc":"//mfcc维数",
+			"n_mfcc":32
+			},
+			
+"sql_param":"//数据库相关参数",
+"sql_param":
+			{
+			"host":"//主机名",
+			"host":"(local)",
+			
+			"user":"//用户名",
+			"user":"sa",
+			
+			"pwd":"//密码",
+			"pwd":"654321",
+			
+			"db":"//库名称",
+			"db":"newdb02",
+			
+			"table":"//表名",
+			"table":"PreTable_hmm"
+			}
+
+}
