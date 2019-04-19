@@ -53,7 +53,7 @@ class MsSQL:
 
 
 def Run():
-    with open('test.json', encoding='UTF-8') as file:
+    with open('sys_config.json', encoding='UTF-8') as file:
         data = json.load(file)
     src_path = data['src_path']
     dst_path = data['dst_path']

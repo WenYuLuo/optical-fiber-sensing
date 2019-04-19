@@ -6,7 +6,7 @@
 "dst_path": "D:\\tmp\\dst", 
 
 "hmm_model":"//hmm模型文件",
-"hmm_model":"D:\\Python\\gmm_hmm\\myModule\\hmms_model_5s200_1024.npy",
+"hmm_model":"D:\\Python\\gmm_hmm\\model",
 
 "hmm_param":"//分帧参数",
 "hmm_param":
@@ -24,6 +24,10 @@
 "sql_param":"//数据库相关参数",
 "sql_param":
 			{
+
+			"isconnect":"//是否连接数据库, 0=不连接，1=连接",
+			"isconnect":"0",
+
 			"host":"//主机名",
 			"host":"(local)",
 			
