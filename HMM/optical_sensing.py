@@ -86,21 +86,24 @@ def Run():
         db = sql_param['db']
         table = sql_param['table']
         ms = MsSQL(host=host, user=user, pwd=pwd, db=db)
+        print('isconnect==1! the alarm will be insert to the SQL server!')
     elif isconnect == 0:
         ms = None
         table = 'empty'
+        print('isconnect==0! the alarm will not be insert to the SQL server!')
     else:
         raise ValueError('isconnect value error! it should be 0 or 1!')
 
     # ms.InsertAlarm(' ', ' ', ' ', ' ')
-    print("start detecting")
+    print("Detecting", end='')
     count = 0
     while True:
         count += 1
         if count % 5 == 0:
-            print('\b\b\b\b', end='')
-            print('    ', end='')
-            print('\b\b\b\b', end='')
+            # print('\b\b\b\b', end='')
+            # print('    ', end='')
+            # print('\b\b\b\b', end='')
+            print("\rDetecting", end='')
         else:
             print('.', end='')
         sys.stdout.flush()
@@ -117,11 +120,15 @@ def Run():
             audio_save_path = os.path.join(dst_path, result, filename)
             shutil.move(wav, audio_save_path)
             # print("Event Occur: %s---%s" % (filename, result))
-            print(("\rEvent Occur: %s---%s" % (filename, result)))
+            print(("\rEvent Occur: %s---%s" % (filename, result)), end=' ')
+            sys.stdout.flush()
             # 添加到数据库
             if ms is not None:
                 date = filename.split('.')[0]
                 ms.InsertAlarm(table, date=date, alarmtype=result, audio_save_path=audio_save_path)
+                print('写入数据库')
+            else:
+                print('')
         # 确保当前list的wav文件已被处理，不被重复处理。
         for wav in wav_list:
             if os.path.exists(wav):
