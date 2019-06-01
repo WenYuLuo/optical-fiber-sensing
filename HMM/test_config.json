@@ -1,0 +1,28 @@
+{
+"test_data_path": "//训练数据所处路径, 目录结构（举例）：									",
+"test_data_path": "//			test_data_path：											",
+"test_data_path": "//						--背景音 										",
+"test_data_path": "//							--*.wav 									",
+"test_data_path": "//						--人工井内施工									",
+"test_data_path": "//							--*.wav										",
+"test_data_path": "//						...												",
+						
+"test_data_path": "E:\\luowenyu\\DailyResearch\\Project\\Yang\\gmm_hmm\\剪辑素材",
+
+
+"hmm_model":"//hmm模型文件存储路径",
+"hmm_model":".\\model",
+
+"seg_param":"//分帧参数",
+"seg_param":
+			{
+			"seg":"//音频分段时长（S）",
+			"seg":4,
+			
+			"nw":"//帧长",
+			"nw":1024,
+			
+			"n_mfcc":"//mfcc维数",
+			"n_mfcc":32
+			}			
+}
