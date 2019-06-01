@@ -51,6 +51,13 @@ class MsSQL:
               % (table_name, date, alarmtype, audio_save_path)
         self.ExecNonQuery(sql)
 
+    def UpdateAlarm(self, table_name, date, alarmtype, audio_save_path):
+        # 修改数据库告警信息
+        date = date[:8] + ' ' + date[8:10] + ':' + date[10:12] + ':' + date[12:14]
+        sql = "UPDATE %s SET ALARMTYPE='%s', AUDIOPATH='%s' WHERE TIME=CAST('%s' AS DATETIME)" \
+              % (table_name, alarmtype, audio_save_path, date)
+        self.ExecNonQuery(sql)
+
 
 def Run():
     with open('sys_config.json', encoding='UTF-8') as file:
@@ -125,7 +132,8 @@ def Run():
             # 添加到数据库
             if ms is not None:
                 date = filename.split('.')[0]
-                ms.InsertAlarm(table, date=date, alarmtype=result, audio_save_path=audio_save_path)
+                # ms.InsertAlarm(table, date=date, alarmtype=result, audio_save_path=audio_save_path)
+                ms.UpdateAlarm(table, date=date, alarmtype=result, audio_save_path=audio_save_path)
                 print('写入数据库')
             else:
                 print('')
